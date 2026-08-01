@@ -1,0 +1,8 @@
+version: 1.2.2
+files:
+  - url: HiveLogic-Monitor-Setup.exe
+    sha512: cyBBkoXH/oPqDCqySRX4tnS4UEh7ZoBL7jjyMIB8baHtO1X+eo+wkYKtkiIK+Tg86yc4gWlk41A8Pj4UH7VhEA==
+    size: 80083330
+path: HiveLogic-Monitor-Setup.exe
+sha512: cyBBkoXH/oPqDCqySRX4tnS4UEh7ZoBL7jjyMIB8baHtO1X+eo+wkYKtkiIK+Tg86yc4gWlk41A8Pj4UH7VhEA==
+releaseDate: '2026-08-01T13:59:55.501Z'

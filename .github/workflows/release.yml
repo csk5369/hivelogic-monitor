@@ -1,0 +1,17 @@
+name: publish-release
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create release with installer assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view v1.2.2 --repo $GITHUB_REPOSITORY && exit 0
+          gh release create v1.2.2 --repo $GITHUB_REPOSITORY --title "HiveLogic Monitor v1.2.2" --notes "Auto-updating build. Consent + update popups can no longer hide behind windows." "HiveLogic-Monitor-Setup.exe" "latest.yml" "HiveLogic-Monitor-Setup.exe.blockmap"
