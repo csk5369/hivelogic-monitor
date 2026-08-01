@@ -13,5 +13,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v1.2.2 --repo $GITHUB_REPOSITORY && exit 0
-          gh release create v1.2.2 --repo $GITHUB_REPOSITORY --title "HiveLogic Monitor v1.2.2" --notes "Auto-updating build. Consent + update popups can no longer hide behind windows." "HiveLogic-Monitor-Setup.exe" "latest.yml" "HiveLogic-Monitor-Setup.exe.blockmap"
+          gh release view v1.2.3 --repo $GITHUB_REPOSITORY && exit 0
+          gh release create v1.2.3 --repo $GITHUB_REPOSITORY --title "HiveLogic Monitor v1.2.3" --notes "Auto-updating build. Consent + update popups can no longer hide behind windows." "HiveLogic-Monitor-Setup.exe" "latest.yml" "HiveLogic-Monitor-Setup.exe.blockmap"
