@@ -1,17 +1,125 @@
 name: publish-release
+
+# Publishes a GitHub release for whatever build is committed here, so
+# electron-updater can find it.
+#
+# WHY THIS WAS REWRITTEN (2026-08-17). The version used to be hardcoded:
+#
+#     gh release view v1.2.3 ... && exit 0
+#     gh release create v1.2.3 ... --title "HiveLogic Monitor v1.2.3"
+#
+# Both the check and the create named v1.2.3, so once that release existed this
+# workflow could only ever succeed at doing nothing. Push a newer installer and
+# it would check out the files, find v1.2.3 present, exit 0, and report green.
+# No release, no error, no clue.
+#
+# That is exactly what happened to 1.2.4: the consent dialog that WARNS people
+# before declining -- and the version reporting that would have shown the
+# rollout -- were ready, while every agent stayed on 1.2.3 and the server had
+# already started clocking people out for declining. The green tick said it
+# worked.
+#
+# So the version is now READ OUT OF latest.yml, which electron-builder generates
+# and electron-updater reads. There is exactly one source of truth for "what
+# version is this", and a release can never again be pinned to an old number by
+# a string nobody remembered to edit.
+#
+# TO SHIP A NEW VERSION: build on Windows, then commit the three artifacts
+# (HiveLogic-Monitor-Setup.exe, its .blockmap, and latest.yml) to this repo's
+# main branch. Nothing here needs editing -- that is the point.
+
 on:
   push:
     branches: [main]
+  workflow_dispatch:        # so a failed run can be retried without a dummy commit
+
 permissions:
   contents: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Create release with installer assets
+
+      - name: Read the version out of latest.yml
+        id: v
+        run: |
+          set -euo pipefail
+          test -f latest.yml || { echo "::error::latest.yml is missing -- electron-updater needs it, and it is where the version comes from."; exit 1; }
+          VERSION="$(sed -n 's/^version:[[:space:]]*//p' latest.yml | head -1 | tr -d '\r')"
+          if [ -z "$VERSION" ]; then
+            echo "::error::latest.yml has no version: line."; exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version from latest.yml: $VERSION"
+
+      - name: Check the installer matches latest.yml
+        run: |
+          set -euo pipefail
+          # latest.yml records the size and hash of the .exe it was generated
+          # with. If someone commits a new installer and an old latest.yml (or
+          # the reverse), the updater downloads a file whose checksum does not
+          # match and fails on the user's machine, silently, forever. Better to
+          # fail here, loudly, before a release exists.
+          for f in HiveLogic-Monitor-Setup.exe latest.yml; do
+            test -f "$f" || { echo "::error::$f is missing from this commit."; exit 1; }
+          done
+          EXPECTED_SIZE="$(sed -n 's/^[[:space:]]*size:[[:space:]]*//p' latest.yml | head -1 | tr -d '\r')"
+          ACTUAL_SIZE="$(stat -c%s HiveLogic-Monitor-Setup.exe)"
+          if [ -n "$EXPECTED_SIZE" ] && [ "$EXPECTED_SIZE" != "$ACTUAL_SIZE" ]; then
+            echo "::error::latest.yml says the installer is $EXPECTED_SIZE bytes but the committed one is $ACTUAL_SIZE. They are from different builds -- rebuild and commit both together."
+            exit 1
+          fi
+          EXPECTED_SHA="$(sed -n 's/^sha512:[[:space:]]*//p' latest.yml | head -1 | tr -d '\r')"
+          ACTUAL_SHA="$(openssl dgst -sha512 -binary HiveLogic-Monitor-Setup.exe | openssl base64 -A)"
+          if [ -n "$EXPECTED_SHA" ] && [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
+            echo "::error::latest.yml's sha512 does not match the committed installer. They are from different builds -- rebuild and commit both together."
+            exit 1
+          fi
+          echo "Installer matches latest.yml ($ACTUAL_SIZE bytes)."
+
+      - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
         run: |
-          gh release view v1.2.3 --repo $GITHUB_REPOSITORY && exit 0
-          gh release create v1.2.3 --repo $GITHUB_REPOSITORY --title "HiveLogic Monitor v1.2.3" --notes "Auto-updating build. Consent + update popups can no longer hide behind windows." "HiveLogic-Monitor-Setup.exe" "latest.yml" "HiveLogic-Monitor-Setup.exe.blockmap"
+          set -euo pipefail
+          ASSETS="HiveLogic-Monitor-Setup.exe latest.yml"
+          if [ -f HiveLogic-Monitor-Setup.exe.blockmap ]; then
+            ASSETS="$ASSETS HiveLogic-Monitor-Setup.exe.blockmap"
+          fi
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Re-uploading beats exiting 0: a re-run after a partial upload used
+            # to be a no-op that reported success, which is how a release with
+            # no latest.yml could sit there looking fine while updating nobody.
+            echo "Release $TAG already exists -- refreshing its assets."
+            gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber $ASSETS
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "HiveLogic Monitor $TAG" \
+              --notes "Auto-updating build. Installer and latest.yml are published together; electron-updater reads latest.yml." \
+              $ASSETS
+          fi
+
+      - name: Prove the release is actually usable
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # A draft release is invisible to electron-updater, and a release
+          # missing latest.yml is inert. Both look like success in the log
+          # above. Assert what an agent actually needs, so green means shipped.
+          IS_DRAFT="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft -q .isDraft)"
+          if [ "$IS_DRAFT" != "false" ]; then
+            echo "::error::$TAG is a DRAFT. Drafts are invisible to the updater -- publish it."
+            exit 1
+          fi
+          NAMES="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name')"
+          for required in HiveLogic-Monitor-Setup.exe latest.yml; do
+            echo "$NAMES" | grep -qx "$required" || { echo "::error::$TAG has no $required attached."; exit 1; }
+          done
+          echo "$TAG is published with the installer and latest.yml. Agents will see it within 30 minutes."
