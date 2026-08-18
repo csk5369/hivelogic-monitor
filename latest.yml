@@ -1,8 +1,8 @@
-version: 1.2.3
+version: 1.2.4
 files:
   - url: HiveLogic-Monitor-Setup.exe
-    sha512: 6hsFBorYHqYgYN12X6PsiKxjGR4z7XE3dB8fe9fBmuBu1DF/5+kaWrHQ4bShDN/L5HbeyofIEOucT1t87ZvRAQ==
-    size: 80127663
+    sha512: r9Ot5Xu3KqADQu9CI+OpDfT7jp8fNBCc6xcsobnJAlQ6Kd0Kg7kJYH1T+5UBgFxMpQ/Ta0EldeSNLemlcSgDDA==
+    size: 79506100
 path: HiveLogic-Monitor-Setup.exe
-sha512: 6hsFBorYHqYgYN12X6PsiKxjGR4z7XE3dB8fe9fBmuBu1DF/5+kaWrHQ4bShDN/L5HbeyofIEOucT1t87ZvRAQ==
-releaseDate: '2026-08-01T16:30:58.461Z'
+sha512: r9Ot5Xu3KqADQu9CI+OpDfT7jp8fNBCc6xcsobnJAlQ6Kd0Kg7kJYH1T+5UBgFxMpQ/Ta0EldeSNLemlcSgDDA==
+releaseDate: '2026-08-18T00:02:47.449Z'
